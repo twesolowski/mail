@@ -70,7 +70,7 @@ if (! isset($options["s"])) {
 
 if (! isset($options["u"])) {
 
-	die("Option -s is mandatory");
+	die("Option -u is mandatory");
 }
 
 $desti = $argv[count($argv)-1];
