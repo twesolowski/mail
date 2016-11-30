@@ -1,0 +1,11 @@
+{
+    "SMTPDebug" : 0,
+    "IsSMTP" : true,
+    "SMTPAuth" : true,
+    "SMTPSecure" : "tls",
+    "Host" : "smtp.gmail.com",
+    "Port" : 587,
+    "Username" : "test@example.com",
+    "Password" : "",
+    "from" : "test@example.com"
+}
