@@ -2,8 +2,8 @@
 A simple command line mail sender via gmail smtp. Usefull to send attchments.
 
 
-## Quick Install
+## Building phar
 
 ```bash
-wget --no-check-certificate https://github.com/twesolowski/mail/blob/master/mail.phar?raw=true -O mail.phar; chmod +x mail.phar
+./compile
 ```

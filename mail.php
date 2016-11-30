@@ -1,8 +1,8 @@
 #!/usr/bin/env php
 <?php
 
-	$includePrefix = __DIR__."/";
-
+$includePrefix = __DIR__."/";
+$defaultConfigFilename = ".phpmailer.json";
 
 require $includePrefix.'class.phpmailer.php';
 require $includePrefix.'class.smtp.php';
@@ -20,8 +20,32 @@ $optionsDefinitions["d:"] = "debug level: 2 would be an interesting value";
 $optionsDefinitions["f:"] = "from: by default it's ".$from;
 $optionsDefinitions["u:"] = "user: MANDATORY smtp username";
 $optionsDefinitions["s:"] = "subject: MANDATORY";
+$optionsDefinitions["c:"] = "phpmailer configuration file: OPTIONAL, default: ".getHome()."/".$defaultConfigFilename;
 
 $options = getopt(implode("", array_keys($optionsDefinitions)));
+
+$configuration = array();
+$configLocationToCheck = isset($options['c']) ? $options['c'] : null;
+
+if($configLocationToCheck){
+    echo "\nTrying to use config from $configLocationToCheck";
+}
+
+$configFileLocation = locateConfigFile( $configLocationToCheck , $defaultConfigFilename);
+
+if($configFileLocation){
+    echo "\nReading configuration from $configFileLocation";
+    $configuration = readConfiguration($configFileLocation);
+}
+
+$preOptions = array(
+    "f" => $configuration['from'],
+    "u" => $configuration['Username'],
+    "d" => $configuration['SMTPDebug'],
+);
+
+$options = array_merge($preOptions, $options);
+
 //	var_dump($options); die();
 foreach($options as $key=>$value) {
 	switch($key) {
@@ -76,34 +100,36 @@ if (! isset($options["u"])) {
 $desti = $argv[count($argv)-1];
 if(preg_match("/^-/", $argv[count($argv)-2])) {
 
-	die("Last argument must be recipient email address, not an option");
+	die("\nLast argument must be recipient email address, not an option");
 }
 
-echo "gmail password for user ".$user.": ";
+$pwd = $configuration['Password'];
+if(!$pwd){
 
-$handle = fopen ("php://stdin","r");
-$pwd = fgets($handle);
-if(trim($pwd) == ''){
-    echo "no password, no job, bye...\n";
+    echo "\nPassword for user ".$user.": ";
+
+    $handle = fopen ("php://stdin","r");
+    $pwd = fgets($handle);
+    if(trim($pwd) == ''){
+        echo "no password, no job, bye...\n";
+    }
+    fclose($handle);
 }
-fclose($handle);
 
 //include("class.smtp.php"); // optional, gets called from within class.phpmailer.php if not already loaded
 
 $mail             = new PHPMailer();
-
 $mail->CharSet = 'UTF-8';
-
-
-$mail->SMTPDebug  = $debugLevel;                     // enables SMTP debug information (for testing)
+$mail->SMTPDebug  =  $configuration['SMTPDebug'];           // enables SMTP debug information (for testing)
                                            // 1 = errors and messages
                                            // 2 = messages only
-
-$mail->IsSMTP(); // telling the class to use SMTP
-$mail->SMTPAuth   = true;                  // enable SMTP authentication
-$mail->SMTPSecure = "tls";                 // sets the prefix to the servier
-$mail->Host       = "smtp.gmail.com";      // sets GMAIL as the SMTP server
-$mail->Port       = 587;                   // set the SMTP port for the GMAIL server
+if($configuration['IsSMTP']){
+    $mail->IsSMTP(); // telling the class to use SMTP
+}
+$mail->SMTPAuth   = $configuration['SMTPAuth'];                  
+$mail->SMTPSecure = $configuration['SMTPSecure'];                 
+$mail->Host       = $configuration['Host'];                     // sets GMAIL as the SMTP server
+$mail->Port       = $configuration['Port'];                   // set the SMTP port for the GMAIL server
 $mail->Username   = $user;  // GMAIL username
 $mail->Password   = $pwd;            // GMAIL password
 
@@ -131,19 +157,71 @@ if($attachs) {
 
 
 if(!$mail->Send()) {
-  echo "Mailer Error: " . $mail->ErrorInfo;
+  echo "\nMailer Error: " . $mail->ErrorInfo;
+  exit(1);
 } else {
-  echo "Message sent!";
+  echo "\nMessage sent!";
+  exit(0);
 }
     
 
- function help() {
+function help() 
+{
 
 global $optionsDefinitions;
-    echo 'Usage ./mail.phar -u "smtpUser" -s "An amazing subject" recipient@domain.tld'. "\n";
+    echo "\n".'Usage ./mail.phar -u "smtpUser" -s "An amazing subject" recipient@domain.tld'. "\n";
  	foreach($optionsDefinitions as $option => $comment) {
  		$option = str_replace(":", "", $option);
  		printf("-%s %s\n", $option, $comment);
 
  	}
- }
+}
+
+function getHome() 
+{
+  $home = getenv('HOME');
+  if (!empty($home)) {
+    $home = rtrim($home, '/');
+  }
+  elseif (!empty($_SERVER['HOMEDRIVE']) && !empty($_SERVER['HOMEPATH'])) {
+    $home = $_SERVER['HOMEDRIVE'] . $_SERVER['HOMEPATH'];
+    $home = rtrim($home, '\\/');
+  }
+  return empty($home) ? NULL : $home;
+}
+
+function locateConfigFile($locationToCheck = null, $defaultConfigFilename = ".phpmailer.json")
+{
+    $defaultConfigLocation = getHome()."/".$defaultConfigFilename;
+    
+    if($locationToCheck && is_readable($locationToCheck)){
+        return $locationToCheck;
+    }elseif(is_readable( $defaultConfigLocation )){
+        return  $defaultConfigLocation;
+    }
+    
+    return null;
+}
+
+function readConfiguration($configFile)
+{
+    $configurationDefault = array(
+        "SMTPDebug" => 0,
+        "IsSMTP" => true,
+        "SMTPAuth" => true,
+        "SMTPSecure" => "tls",
+        "Host" => "smtp.gmail.com",
+        "Port" => 587,
+        "Username" => "",
+        "Password" => "",
+        "from" => ""
+    );
+    $content = file_get_contents($configFile);
+    $configuration = json_decode($content, true);
+    if((json_last_error() === JSON_ERROR_NONE)){
+        return array_merge($configurationDefault , $configuration);
+    }else{
+        die("$configFile - JSON Error");
+    }
+    return $configurationDefault;
+}
