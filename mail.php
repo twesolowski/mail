@@ -8,7 +8,7 @@ require $includePrefix.'class.phpmailer.php';
 require $includePrefix.'class.smtp.php';
 
 $from=get_current_user()."@".gethostname();
-$body= "See attachment(s).";
+$body= "";
 $attachs = false;
 $debugLevel=0;
 
@@ -78,6 +78,9 @@ foreach($options as $key=>$value) {
 		break;
 		
 	}
+}
+if(!$body){
+    $body =  stream_get_contents(STDIN);
 }
 
 if(count($options) == 0) {
